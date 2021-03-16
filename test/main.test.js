@@ -1,4 +1,4 @@
-const { expect } = require('chai');
+const { expect, assert } = require('chai');
 const fs = require('fs');
 const fsExtra = require("fs-extra");
 const {
@@ -17,7 +17,7 @@ describe('search file or folder by name and extension', () => {
     for (let i = 0; i < result.length; i += 1) {
       const { location } = result[i];
       if (!fs.existsSync(location)) {
-        console.log(location);
+        console.log("This location does not exist in folder but exists in db: ", location);
       }
       expect(fs.existsSync(location)).equals(true);
     }
@@ -28,18 +28,18 @@ describe('search file or folder by name and extension', () => {
     for (let i = 0; i < result.length; i += 1) {
       const { location } = result[i];
       if (!fs.existsSync(location)) {
-        console.log(location);
+        console.log("This location does not exist in folder but exists in db: ", location);
       }
       expect(fs.existsSync(location)).equals(true);
     }
   });
 
   it('name and extension search', async () => {
-    const result = await searchByNameAndExtension('1', 'txt');
+    const result = await searchByNameAndExtension('test', 'txt');
     for (let i = 0; i < result.length; i += 1) {
       const { location } = result[i];
       if (!fs.existsSync(location)) {
-        console.log(location);
+        console.log("This location does not exist in folder but exists in db: ", location);
       }
       expect(fs.existsSync(location)).equals(true);
     }
@@ -54,8 +54,8 @@ describe('get size of folder or file', () => {
   });
 
   it('size of file', async () => {
-    const result = await getSizeOfFileOrFolder('testing-folder/test-file.txt');
-    const data = (await fs.promises.stat('testing-folder/test-file.txt')).size;
+    const result = await getSizeOfFileOrFolder('testing-folder/searching-file/test-file.txt');
+    const data = (await fs.promises.stat('testing-folder/searching-file/test-file.txt')).size;
     expect(result[0].size).equals(data);
   });
 
@@ -67,135 +67,98 @@ describe('get size of folder or file', () => {
   });
 });
 
-describe('sort table', () => {
+describe('sort table', async () => {
   it('sort by default modifier: createdDate', async () => {
-    const result = sortTableByModifier();
+    const result = await sortTableByModifier();
     let flag = true;
     for (let i = 0; i < result.length - 1; i += 1) {
-      if (new Date(result[i].createdDate) < new Date(result[i + 1].createdDate)) {
-        flag = false;
-        break;
-      }
+      expect(new Date(result[i].createdDate) >= new Date(result[i+1].createdDate)).equals(true);
     }
-    expect(flag).equals(true);
   });
 
-  it('sort by name', () => {
-    const result = sortTableByModifier('name');
-    let flag = true;
+  it('sort by name', async () => {
+    const result = await sortTableByModifier('name');
     for (let i = 0; i < result.length - 1; i += 1) {
-      if (result[i].name < result[i + 1].name) {
-        flag = false;
-        break;
-      }
+      expect(result[i].name >= result[i+1].name).equals(true);
     }
-    expect(flag).equals(true);
   });
 
-  it('sort by name in asc', () => {
-    const result = sortTableByModifier('name', 'asc');
+  it('sort by name in asc', async () => {
+    const result = await sortTableByModifier('name', 'asc');
     let flag = true;
     for (let i = 0; i < result.length - 1; i += 1) {
-      if (result[i].name > result[i + 1].name) {
-        flag = false;
-        break;
-      }
+      expect(result[i].name <= result[i + 1].name).equals(true);
     }
-    expect(flag).equals(true);
   });
 });
 
-describe('add new folder', async () => {
-  let fileName = Date.parse(new Date());
-  await beforeEach(async () => {
-    if (fs.existsSync('testing-folder/creating-file/1')) {
-      await deleteFileOrFolder('testing-folder/creating-file/1');
-    }
-    if (fs.existsSync('testing-folder/creating-file/1-new-name')) {
-      await deleteFileOrFolder('testing-folder/creating-file/1-new-name');
-    }
-    if(fs.existsSync("testing-folder/creating-file/"+newfileName)){
-      await deleteFileOrFolder("testing-folder/creating-file/"+newfileName)
-    }
-  });
+describe('add new folder', () => {
   
   it('add blank folder', async () => {
     const result = await addNewFolder('testing-folder/creating-file');
-    const search = await searchByNameAndExtension(result.lastIndexOf('/'));
-
-    let flag = false;
-    setTimeout(() => {
+    const folderToSearch = result.substring(result.lastIndexOf('/')+1);
+    
+    setTimeout(async ()=>{
+      const search = await searchByNameAndExtension(folderToSearch);
       for (let i = 0; i < search.length; i += 1) {
-        if (search[i].location === result) {
-          flag = true;
-          break;
-        }
+        setTimeout(()=>{
+          expect(fs.existsSync(search[i].location)).equals(true);
+        },100);
       }
-      expect(flag).equals(true);
-    }, 100);
+    }, 1000);
   });
 
   it('add blank folder with name', async () => {
-    let add = await addNewFolder('testing-folder/creating-file', fileName);
-    console.log("*************");
-    console.log("adding");
-    console.log(add);
-    let flag = false;
+    let folderName = "blank-folder";
+    if (fs.existsSync('testing-folder/creating-file/'+folderName)) {
+       fsExtra.removeSync('testing-folder/creating-file/'+folderName);
+    }
+    let add = await addNewFolder('testing-folder/creating-file', folderName);
     setTimeout(async () => {
-      const search = await searchByNameAndExtension(fileName);
+      const search = await searchByNameAndExtension(folderName);
       for (let i = 0; i < search.length; i += 1) {
-        if (search[i].location === `testing-folder/creating-file/${fileName}`) {
-          flag = true;
-          break;
-        }
+        setTimeout(()=>{
+          expect(fs.existsSync(search[i].location)).equals(true);
+        },100);
       }
-      expect(flag).equals(true);
-    }, 100);
+    }, 1000);
   });
 
   it('copy folder without name', async () => {
-    const result = await addNewFolder('testing-folder/creating-file', '', 'testing-folder/creating-file/1');
-    const search = await searchByNameAndExtension(result.lastIndexOf('/'));
+    let folderName = "copy-original-folder";
+    if(!fsExtra.existsSync("testing-folder/creating-file/"+folderName)){
+      fs.mkdirSync("testing-folder/creating-file/"+folderName);
+    }
+    const result = await addNewFolder('testing-folder/creating-file', '', 'testing-folder/creating-file/'+folderName);
     setTimeout(async () => {
-      let flag = false;
+      const search = await searchByNameAndExtension(result.substring(result.lastIndexOf('/')+1));
       for (let i = 0; i < search.length; i += 1) {
-        if (search[i].location === result) {
-          flag = true;
-          break;
-        }
+        setTimeout(()=>{
+          expect(fs.existsSync(search[i].location)).equals(true);
+        },100);
       }
-      expect(flag).equals(true);
-    }, 100);
+    }, 1000);
   });
 
-  it('copy folder with name', async () => {
-    const name = 'copyFolder';
+  // it('copy folder with name', async () => {
+  //   const name = 'copy-folder';
+  //   const result = await addNewFolder('testing-folder/creating-file', name, 'testing-folder/creating-file/1');
 
-    const result = await addNewFolder('testing-folder/creating-file', name, 'testing-folder/creating-file/1');
-    console.log('dddd');
-    console.log(result);
-
-    setTimeout(async () => {
-      const search = await searchByNameAndExtension(name);
-      let flag = false;
-      for (let i = 0; i < search.length; i += 1) {
-        if (search[i].location === `testing-folder/creating-file/${name}`) {
-          flag = true;
-          break;
-        }
-      }
-      expect(flag).equals(true);
-    }, 100);
-  });
+  //   setTimeout(async () => {
+  //     const search = await searchByNameAndExtension(name);
+      
+  //     for (let i = 0; i < search.length; i += 1) {
+  //       setTimeout(()=>{
+  //         expect(fs.existsSync(search[i].location)).equals(true);
+  //       },100);
+  //     }
+      
+  //   }, 1000);
+  // });
 });
 
-describe('add new file', async () => {
-  await beforeEach(async () => {
-    if (fs.existsSync('testing-folder/creating-file/1.txt')) {
-      await deleteFileOrFolder('testing-folder/creating-file/1.txt');
-    }
-  });
-
+describe('add new file', () => {
+  
   it('add blank file', async () => {
     const result = await addNewFile('testing-folder/creating-file');
     setTimeout(async () => {
@@ -212,156 +175,146 @@ describe('add new file', async () => {
   });
 
   it('add blank file with name', async () => {
-    const result = await addNewFile('testing-folder/creating-file', Date.parse(new Date()));
+    let fileName = "new-file"
+    const result = await addNewFile('testing-folder/creating-file', fileName);
     setTimeout(async () => {
       let flag = false;
-      const search = await searchByNameAndExtension(Date.parse(new Date()));
-      for (let i = 0; i < search.length; i += 1) {
-        if (search[i].location === result) {
-          flag = true;
-          break;
-        }
-      }
-      expect(flag).equals(true);
-    });
-  });
-
-  it('copy file with name', async () => {
-    const result = await addNewFile('testing-folder/creating-file', 'created-file-copy', 'testing-folder/creating-file/1.txt');
-    setTimeout(async () => {
-      let flag = false;
-      const search = await searchByNameAndExtension(result.substring(result.lastIndexOf('/')));
-      for (let i = 0; i < search.length; i += 1) {
-        if (search[i].location === result) {
-          flag = true;
-          break;
-        }
-      }
-      expect(flag).equals(true);
-    });
-  });
-  it('copy file without name', async () => {
-    const result = await addNewFile('testing-folder/creating-file', '', 'testing-folder/creating-file/1.txt');
-    setTimeout(async () => {
-      let flag = false;
-      const search = await searchByNameAndExtension(result.substring(result.lastIndexOf('/')));
-      for (let i = 0; i < search.length; i += 1) {
-        if (search[i].location === result) {
-          flag = true;
-          break;
-        }
-      }
-      expect(flag).equals(true);
-    });
-  });
-});
-
-describe('delete file or folder', async () => {
-   await beforeEach( () => {
-    if (fs.existsSync('testing-folder/deleting-file/2.txt')) {
-      fs.unlinkSync('testing-folder/deleting-file/2.txt');
-    }
-    if (fs.existsSync('testing-folder/deleting-file/2')) {
-      // deleteFileOrFolder('testing-folder/deleting-file/2');
-      fsExtra.removeSync('testing-folder/deleting-file/2');
-
-    }
-    if (!fs.existsSync('testing-folder/deleting-file/1.txt')) {
-      fs.closeSync(fs.openSync('testing-folder/deleting-file', '1.txt'));
-    }
-    if (!fs.existsSync('testing-folder/deleting-file/1')) {
-      fs.mkdir("testing-folder/deleting-file/1");
-    }
-  });
-
-  it('folder that exists', async () => {
-    const result = await deleteFileOrFolder('testing-folder/deleting-file/1');
-    expect(result).equals(true);
-    setTimeout(async () => {
-      const search = await searchByNameAndExtension('1');
-      for (let i = 0; i < search.length; i += 1) {
-        expect(search[i].location).not.equals('testing-folder/deleting-file/1');
-      }
-    }, 100);
-  });
-
-  it('file that exists', async () => {
-    const result = await deleteFileOrFolder('testing-folder/deleting-file/1.txt');
-    expect(result).equals(true);
-    setTimeout(async () => {
-      const search = await searchByNameAndExtension('1.txt');
-      for (let i = 0; i < search.length; i += 1) {
-        expect(search[i].location).not.equals('testing-folder/deleting-file/1.txt');
-      }
-    }, 100);
-  });
-
-  it('folder or file that does not exist', async () => {
-    let flag = false;
-    try {
-      await deleteFileOrFolder('testing-file/deleting-file/2');
-    } catch (e) {
-      try {
-        await deleteFileOrFolder('testing-file/deleting-file/2.txt');
-      } catch (e2) {
-        flag = true;
-      }
-    }
-
-    expect(flag).equals(true);
-  });
-});
-
-describe('rename file or folder', () => {
-  beforeEach(async () => {
-    if (fs.existsSync('testing-folder/renaming-file/2.txt')) {
-      await deleteFileOrFolder('testing-folder/renaming-file/2.txt');
-    }
-    if (fs.existsSync('testing-folder/renaming-file/2')) {
-      await deleteFileOrFolder('testing-folder/renaming-file/2');
-    }
-    if (!fs.existsSync('testing-folder/renaming-file/4.txt')) {
-      await addNewFile('testing-folder/renaming-file/4.txt');
-    }
-    if (!fs.existsSync('testing-folder/renaming-file/4')) {
-      await addNewFolder('testing-folder/renaming-file/4');
-    }
-  });
-
-  it('file that exists', async () => {
-    const fileName = Date.parse(new Date());
-    await renameFileOrFolder('testing-file/renaming-file/1.txt', `${fileName}.txt`);
-    let flag = true;
-    setTimeout(async () => {
       const search = await searchByNameAndExtension(fileName);
       for (let i = 0; i < search.length; i += 1) {
-        if (search[i].location === `esting-folder/renaming-file/${Date.parse(fileName)}.txt`) {
+        if (search[i].location === result) {
           flag = true;
+          break;
         }
       }
       expect(flag).equals(true);
-    }, 100);
+    });
   });
+
+  // it('copy file with name', async () => {
+  //   const result = await addNewFile('testing-folder/creating-file', 'created-file-copy', 'testing-folder/creating-file/1.txt');
+  //   setTimeout(async () => {
+  //     let flag = false;
+  //     const search = await searchByNameAndExtension(result.substring(result.lastIndexOf('/')));
+  //     for (let i = 0; i < search.length; i += 1) {
+  //       if (search[i].location === result) {
+  //         flag = true;
+  //         break;
+  //       }
+  //     }
+  //     expect(flag).equals(true);
+  //   });
+  // });
+  // it('copy file without name', async () => {
+  //   const result = await addNewFile('testing-folder/creating-file', '', 'testing-folder/creating-file/1.txt');
+  //   setTimeout(async () => {
+  //     let flag = false;
+  //     const search = await searchByNameAndExtension(result.substring(result.lastIndexOf('/')));
+  //     for (let i = 0; i < search.length; i += 1) {
+  //       if (search[i].location === result) {
+  //         flag = true;
+  //         break;
+  //       }
+  //     }
+  //     expect(flag).equals(true);
+  //   });
+  // });
+});
+
+describe('delete file or folder', () => {
+
   it('folder that exists', async () => {
-    await renameFileOrFolder('testing-file/renaming-file/1', Date.parse(new Date()));
-    setTimeout(async () => {
-      const search = await searchByNameAndExtension(Date.parse(new Date()));
-      for (let i = 0; i < search.length; i += 1) {
-        expect(search[i].location).not.equals('testing-folder/renaming-file/1');
-      }
-    }, 100);
+    let folderName = "new-delete-folder";
+    if (!fs.existsSync('testing-folder/deleting-file/'+folderName)) {
+      fs.mkdirSync("testing-folder/deleting-file/"+folderName);
+    }
+    const result = await deleteFileOrFolder('testing-folder/deleting-file/'+folderName);
+    const search = await searchByNameAndExtension(folderName);
+    expect(result).equals(true);
+    expect(search.length).equals(0);
   });
+
+  it('file that exists', async () => {
+    let fileName = "new-delete-file.txt";
+    if (!fs.existsSync('testing-folder/deleting-file/'+fileName)) {
+      fs.closeSync(fs.openSync('testing-folder/deleting-file/'+fileName, 'w+'));
+    }
+    const result = await deleteFileOrFolder('testing-folder/deleting-file/'+fileName);
+    const search = await searchByNameAndExtension(fileName);
+    expect(result).equals(true);
+    expect(search.length).equals(0);
+  });
+
   it('folder or file that does not exist', async () => {
+    let folderName = "not-existing-folder";
+    let fileName = "not-existing-file.txt";
     let flag = false;
-    try {
-      await renameFileOrFolder('testing-file/renaming-file/2.txt', 'fail.txt');
-    } catch (e) {
-      try {
-        await renameFileOrFolder('testing-file/renaming-file/2', 'fail');
-      } catch (e2) {
-        flag = true;
+    try{
+      await deleteFileOrFolder('testing-file/deleting-file/'+folderName);
+    }
+    catch(e){
+      try{
+        await deleteFileOrFolder('testing-file/deleting-file/'+fileName);
+      }
+      catch(e2){
+        flag = true
       }
     }
     expect(flag).equals(true);
+
   });
 });
+
+// describe('rename file or folder', () => {
+//   beforeEach(() => {
+//     if (fs.existsSync('testing-folder/renaming-file/2.txt')) {
+//       fs.unlinkSync('testing-folder/renaming-file/2.txt');
+//     }
+//     if (fs.existsSync('testing-folder/renaming-file/2')) {
+//       fsExtra.removeSync('testing-folder/renaming-file/2');
+//     }
+//     if (!fs.existsSync('testing-folder/renaming-file/new-file.txt')) {
+//       fs.closeSync(fs.openSync('testing-folder/renaming-file/new-file.txt'));
+//     }
+//     if (!fs.existsSync('testing-folder/renaming-file/new-folder')) {
+//       fs.mkdir('testing-folder/renaming-file/new-folder');
+//     }
+//   });
+
+//   it('file that exists', async () => {
+//     let fileName = "existing-file";
+//     await renameFileOrFolder('testing-file/renaming-file/new-file.txt', `${fileName}.txt`);
+//     let flag = true;
+//     setTimeout(async () => {
+//       const search = await searchByNameAndExtension(fileName);
+//       for (let i = 0; i < search.length; i += 1) {
+//         if (search[i].location === `esting-folder/renaming-file/${Date.parse(fileName)}.txt`) {
+//           flag = true;
+//         }
+//       }
+//       expect(flag).equals(true);
+//     }, 100);
+//   });
+//   it('folder that exists', async () => {
+//     let folderName = "existing-folder";
+//     await renameFileOrFolder('testing-file/renaming-file/new-folder', folderName);
+//     setTimeout(async () => {
+//       const search = await searchByNameAndExtension(folderName);
+//       for (let i = 0; i < search.length; i += 1) {
+//         expect(search[i].location).not.equals(`testing-folder/renaming-file/${folderName}`);
+//       }
+//     }, 100);
+//   });
+//   it('folder or file that does not exist', async () => {
+//     let flag = false;
+//     try {
+//       await renameFileOrFolder('testing-file/renaming-file/not-existing.txt', 'fail.txt');
+//     } catch (e) {
+//       try {
+//         await renameFileOrFolder('testing-file/renaming-file/not-existing', 'fail');
+//       } catch (e2) {
+//         flag = true;
+//       }
+//     }
+//     expect(flag).equals(true);
+//   });
+// });
